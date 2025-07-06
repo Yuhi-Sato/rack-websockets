@@ -48,7 +48,20 @@ class WebSocketApp
   end
 
   # WebSocket フレームを読み取り、簡単なエコー処理を行う
+  # さらに定期的にサーバーからクライアントへメッセージを送信する
   def handle_websocket(sock)
+    # 定期送信スレッド。sleep を使って 5 秒毎にメッセージを送る
+    sender = Thread.new do
+      loop do
+        sleep 5
+        begin
+          send_frame(sock, "server ping", 0x1)
+        rescue IOError, Errno::EPIPE
+          break
+        end
+      end
+    end
+
     loop do
       # まず 2 バイトのヘッダを取得
       header = sock.read(2)
@@ -83,6 +96,8 @@ class WebSocketApp
         send_frame(sock, "echo: #{msg}", 0x1)
       end
     end
+  ensure
+    sender.kill if sender
   end
 
   # サーバーからクライアントへ WebSocket フレームを送信する
